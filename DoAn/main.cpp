@@ -256,28 +256,56 @@ int main() {
                             double currentW = weights[selectedWeightIdx];
 
                             if (!isDelivering) {
-                                int destR = inventory[selectedProductIdx].targetRow, destC = inventory[selectedProductIdx].targetCol;
-                                vector<Node*> rePath = pRe.findPath(robotRow, robotCol, destR, destC, grid, currentW);
-                                if (!rePath.empty()) {
-                                    Pathfinding pReturnRe;
-                                    returnPathNodes = pReturnRe.findPath(destR, destC, deliveryRow, deliveryCol, grid, currentW);
-                                    if (!returnPathNodes.empty()) {
-                                        fullPath.clear();
-                                        for (auto n : rePath) fullPath.push_back({ n->row, n->col });
-                                        pathIndex = 1; pathLength = (int)rePath.size(); nodesVisited = pRe.getNodesVisited();
-                                        statusText = "FETCHING: " + inventory[selectedProductIdx].name;
+                                int sRow = inventory[selectedProductIdx].shelfRow;
+                                int sCol = inventory[selectedProductIdx].shelfCol;
+
+                                int originalVal = grid[sRow][sCol];
+                                grid[sRow][sCol] = 0;
+                                vector<Node*> rePath = pRe.findPath(robotRow, robotCol, sRow, sCol, grid, currentW);
+                                grid[sRow][sCol] = originalVal;
+
+                                if (!rePath.empty() && rePath.size() >= 2) {
+                                    Node* newTarget = rePath[rePath.size() - 2];
+                                    inventory[selectedProductIdx].targetRow = newTarget->row;
+                                    inventory[selectedProductIdx].targetCol = newTarget->col;
+
+                                    fullPath.clear();
+                                    for (size_t j = 0; j < rePath.size() - 1; j++) {
+                                        fullPath.push_back({ rePath[j]->row, rePath[j]->col });
                                     }
+
+                                    pathIndex = 1;
+                                    pathLength = (int)fullPath.size() - 1;
+
+                                    nodesVisited = pRe.getNodesVisited();
+                                    statusText = "FETCHING: " + inventory[selectedProductIdx].name;
+
+                                    Pathfinding pReturnRe;
+                                    returnPathNodes = pReturnRe.findPath(newTarget->row, newTarget->col, deliveryRow, deliveryCol, grid, currentW);
+                                }
+                                else {
+                                    statusText = "SYSTEM HALTED: NO PATH";
+                                    systemState = 0;
+                                    fullPath.clear();
                                 }
                             }
                             else {
                                 vector<Node*> rePath = pRe.findPath(robotRow, robotCol, deliveryRow, deliveryCol, grid, currentW);
                                 if (!rePath.empty()) {
-                                    fullPath.clear(); for (auto n : rePath) fullPath.push_back({ n->row, n->col });
-                                    pathIndex = 1; pathLength = (int)rePath.size(); nodesVisited = pRe.getNodesVisited();
+                                    fullPath.clear();
+                                    for (auto n : rePath) fullPath.push_back({ n->row, n->col });
+                                    pathIndex = 1;
+                                    pathLength = (int)rePath.size() - 1;
+
+                                    nodesVisited = pRe.getNodesVisited();
                                     statusText = "DELIVERING TO STATION";
                                 }
+                                else {
+                                    statusText = "SYSTEM HALTED: BLOCKED HOME";
+                                    systemState = 0;
+                                    fullPath.clear();
+                                }
                             }
-                            if (fullPath.empty()) { statusText = "SYSTEM HALTED: BLOCKED!"; systemState = 0; fullPath.clear(); continue; }
                         }
                         else {
                             robotRow = fullPath[pathIndex].first; robotCol = fullPath[pathIndex].second;
