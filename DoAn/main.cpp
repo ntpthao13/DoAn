@@ -194,19 +194,20 @@ int main() {
             for (int k = pathIndex; k < (int)fullPath.size(); k++) {
                 currentRemainingNodes.push_back(new Node(fullPath[k].first, fullPath[k].second));
             }
+            if (!isDelivering) {
+                currentRemainingNodes.push_back(new Node(inventory[selectedProductIdx].shelfRow, inventory[selectedProductIdx].shelfCol));
+            }
             float rotTimeCurrent = GetPathRotationTime(currentRemainingNodes, visualAngle, rotationSpeed);
             for (auto n : currentRemainingNodes) delete n;
+            currentRemainingNodes.clear();
 
             if (!isDelivering && !isWaitingAtPickup) {
                 // Đang đi lấy hàng: Path hiện tại + Chờ + Path về
                 float moveTimeReturn = (returnPathNodes.empty()) ? 0.0f : ((int)returnPathNodes.size() - 1) * moveSpeed;
 
                 // Góc bắt đầu của path về là góc cuối của path đi
-                float lastAngleGo = visualAngle;
-                if (fullPath.size() >= 2) {
-                    lastAngleGo = atan2f((float)fullPath.back().first - (float)fullPath[fullPath.size() - 2].first,
-                        (float)fullPath.back().second - (float)fullPath[fullPath.size() - 2].second);
-                }
+                float lastAngleGo = atan2f((float)inventory[selectedProductIdx].shelfRow - (float)inventory[selectedProductIdx].targetRow,
+                    (float)inventory[selectedProductIdx].shelfCol - (float)inventory[selectedProductIdx].targetCol);
                 float rotTimeReturn = GetPathRotationTime(returnPathNodes, lastAngleGo, rotationSpeed);
 
                 estimatedTime = (moveTimeCurrent + rotTimeCurrent) + 2.0f + (moveTimeReturn + rotTimeReturn);
@@ -214,9 +215,11 @@ int main() {
             else if (isWaitingAtPickup) {
                 // Đang chờ: Thời gian chờ còn lại + Path về
                 float moveTimeReturn = (returnPathNodes.empty()) ? 0.0f : ((int)returnPathNodes.size() - 1) * moveSpeed;
-                float rotTimeReturn = GetPathRotationTime(returnPathNodes, visualAngle, rotationSpeed);
+                float angleLookingAtShelf = atan2f((float)inventory[selectedProductIdx].shelfRow - (float)robotRow,
+                    (float)inventory[selectedProductIdx].shelfCol - (float)robotCol);
+                float rotTimeReturn = GetPathRotationTime(returnPathNodes, angleLookingAtShelf, rotationSpeed);
 
-                estimatedTime = (2.0f - pickupTimer) + (moveTimeReturn + rotTimeReturn);
+                estimatedTime = rotTimeCurrent + (2.0f - pickupTimer) + (moveTimeReturn + rotTimeReturn);
             }
             else {
                 // Đang giao hàng: Chỉ tính path hiện tại
