@@ -4,6 +4,7 @@
 #include <string>
 #include <algorithm>
 #include <cmath>
+#include<map>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -57,7 +58,9 @@ vector<vector<int>> LoadMap(const string& fileName) {
         file >> rows >> cols;
         grid.resize(rows, vector<int>(cols));
         for (int i = 0; i < rows; i++) {
-            for (int j = 0; j < cols; j++) file >> grid[i][j];
+            for (int j = 0; j < cols; j++) {
+                file >> grid[i][j];
+            }
         }
         file.close();
     }
@@ -68,6 +71,15 @@ int main() {
     SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_WINDOW_MAXIMIZED);
     InitWindow(1280, 720, "WAREHOUSE AGV NAVIGATION SYSTEM");
     SetTargetFPS(60);
+
+    map<string, Texture2D> productIcons;
+    string iconPath = "D:/Thao/DoAn/assets/icons/";
+
+    productIcons["Keyboard"] = LoadTexture((iconPath + "Keyboard.png").c_str());
+    productIcons["Laptop Dell"] = LoadTexture((iconPath + "Laptop Dell.png").c_str());
+    productIcons["Mouse"] = LoadTexture((iconPath + "Mouse.png").c_str());
+    productIcons["Macbook Pro"] = LoadTexture((iconPath + "Macbook Pro.png").c_str());
+    productIcons["Monitor"] = LoadTexture((iconPath + "Monitor.png").c_str());
 
     vector<vector<int>> grid = LoadMap("D:/Thao/DoAn/map.txt");
     if (grid.empty()) grid = vector<vector<int>>(20, vector<int>(30, 0));
@@ -144,27 +156,40 @@ int main() {
 
                             if (!returnPathNodes.empty()) {
                                 fullPath.clear();
-                                for (size_t j = 0; j < pathNodes.size() - 1; j++) fullPath.push_back({ pathNodes[j]->row, pathNodes[j]->col });
+                                for (size_t j = 0; j < pathNodes.size() - 1; j++) {
+                                    fullPath.push_back({ pathNodes[j]->row, pathNodes[j]->col });
+                                }
                                 inventory[i].targetRow = targetNode->row;
                                 inventory[i].targetCol = targetNode->col;
                                 pathLength = (int)pathNodes.size() - 2;
                                 nodesVisited = pGo.getNodesVisited();
-                                totalTravelTime = 0.0f; pathIndex = 1; systemState = 2;
+                                totalTravelTime = 0.0f; 
+                                pathIndex = 1; 
+                                systemState = 2;
                                 statusText = "FETCHING: " + inventory[i].name;
                             }
                             else statusText = "ERROR: NO RETURN PATH!";
                         }
                         else statusText = "ERROR: PATH BLOCKED!";
 
-                        grid[sRow][sCol] = originalVal; dropdownOpen = false; actionTaken = true; break;
+                        grid[sRow][sCol] = originalVal; 
+                        dropdownOpen = false; 
+                        actionTaken = true; 
+                        break;
                     }
                 }
-                if (!actionTaken) dropdownOpen = false;
+                if (!actionTaken) {
+                    dropdownOpen = false;
+                }
                 actionTaken = true;
             }
             if (!actionTaken && systemState == 0) {
-                if (CheckCollisionPointRec(mousePos, dropdownBox)) { dropdownOpen = true; dropdownWeightOpen = false; }
-                else if (CheckCollisionPointRec(mousePos, dropdownWeightBox)) { dropdownWeightOpen = true; dropdownOpen = false; }
+                if (CheckCollisionPointRec(mousePos, dropdownBox)) { 
+                    dropdownOpen = true; dropdownWeightOpen = false; 
+                }
+                else if (CheckCollisionPointRec(mousePos, dropdownWeightBox)) {
+                    dropdownWeightOpen = true; dropdownOpen = false; 
+                }
             }
         }
 
@@ -179,18 +204,13 @@ int main() {
 
         if (systemState == 2 && !fullPath.empty()) {
             totalTravelTime += GetFrameTime();
-
-            // --- LOGIC SỬA ĐỔI ESTIMATETIME (TÍNH CẢ THỜI GIAN XOAY) ---
             bool isDelivering = (statusText.find("DELIVERING") != string::npos);
 
-            // 1. Tính thời gian cho quãng đường hiện tại (Move + Rotation)
             int remainingNodesCurrent = (int)fullPath.size() - pathIndex;
             float moveTimeCurrent = remainingNodesCurrent * moveSpeed;
 
             vector<Node*> currentRemainingNodes;
-            // Node hiện tại robot đang đứng
             currentRemainingNodes.push_back(new Node(robotRow, robotCol));
-            // Các node còn lại trong path
             for (int k = pathIndex; k < (int)fullPath.size(); k++) {
                 currentRemainingNodes.push_back(new Node(fullPath[k].first, fullPath[k].second));
             }
@@ -202,10 +222,8 @@ int main() {
             currentRemainingNodes.clear();
 
             if (!isDelivering && !isWaitingAtPickup) {
-                // Đang đi lấy hàng: Path hiện tại + Chờ + Path về
                 float moveTimeReturn = (returnPathNodes.empty()) ? 0.0f : ((int)returnPathNodes.size() - 1) * moveSpeed;
 
-                // Góc bắt đầu của path về là góc cuối của path đi
                 float lastAngleGo = atan2f((float)inventory[selectedProductIdx].shelfRow - (float)inventory[selectedProductIdx].targetRow,
                     (float)inventory[selectedProductIdx].shelfCol - (float)inventory[selectedProductIdx].targetCol);
                 float rotTimeReturn = GetPathRotationTime(returnPathNodes, lastAngleGo, rotationSpeed);
@@ -213,7 +231,6 @@ int main() {
                 estimatedTime = (moveTimeCurrent + rotTimeCurrent) + 2.0f + (moveTimeReturn + rotTimeReturn);
             }
             else if (isWaitingAtPickup) {
-                // Đang chờ: Thời gian chờ còn lại + Path về
                 float moveTimeReturn = (returnPathNodes.empty()) ? 0.0f : ((int)returnPathNodes.size() - 1) * moveSpeed;
                 float angleLookingAtShelf = atan2f((float)inventory[selectedProductIdx].shelfRow - (float)robotRow,
                     (float)inventory[selectedProductIdx].shelfCol - (float)robotCol);
@@ -222,10 +239,8 @@ int main() {
                 estimatedTime = rotTimeCurrent + (2.0f - pickupTimer) + (moveTimeReturn + rotTimeReturn);
             }
             else {
-                // Đang giao hàng: Chỉ tính path hiện tại
                 estimatedTime = moveTimeCurrent + rotTimeCurrent;
             }
-            // ---------------------------------------------------------
 
             float targetX = isWaitingAtPickup ? (float)inventory[selectedProductIdx].shelfCol : (float)fullPath[pathIndex].second;
             float targetY = isWaitingAtPickup ? (float)inventory[selectedProductIdx].shelfRow : (float)fullPath[pathIndex].first;
@@ -241,18 +256,32 @@ int main() {
                     statusText = "PICKUP: " + inventory[selectedProductIdx].name;
                     pickupTimer += GetFrameTime();
                     if (pickupTimer >= 2.0f) {
-                        isWaitingAtPickup = false; pickupTimer = 0.0f; fullPath.clear();
-                        for (auto n : returnPathNodes) fullPath.push_back({ n->row, n->col });
-                        if (!fullPath.empty()) { pathIndex = 1; statusText = "DELIVERING TO STATION"; }
-                        else { statusText = "ERROR: RETURN BLOCKED!"; systemState = 0; }
+                        isWaitingAtPickup = false; 
+                        pickupTimer = 0.0f;
+                        fullPath.clear();
+                        for (auto n : returnPathNodes) {
+                            fullPath.push_back({ n->row, n->col });
+                        }
+                        if (!fullPath.empty()) { 
+                            pathIndex = 1; 
+                            statusText = "DELIVERING TO STATION";
+                        }
+                        else {
+                            statusText = "ERROR: RETURN BLOCKED!";
+                            systemState = 0;
+                        }
                     }
                 }
                 else {
                     moveTimer += GetFrameTime();
                     if (moveTimer >= moveSpeed) {
                         bool isBlocked = false;
-                        for (int k = pathIndex; k < (int)fullPath.size(); k++) if (grid[fullPath[k].first][fullPath[k].second] == 1) { isBlocked = true; break; }
-
+                        for (int k = pathIndex; k < (int)fullPath.size(); k++) {
+                            if (grid[fullPath[k].first][fullPath[k].second] == 1) {
+                                isBlocked = true; 
+                                break; 
+                            }
+                        }
                         if (isBlocked) {
                             statusText = "RE-ROUTING...";
                             Pathfinding pRe;
@@ -311,13 +340,27 @@ int main() {
                             }
                         }
                         else {
-                            robotRow = fullPath[pathIndex].first; robotCol = fullPath[pathIndex].second;
-                            if (pathIndex < (int)fullPath.size() - 1) pathIndex++;
-                            else if (selectedProductIdx != -1 && robotRow == inventory[selectedProductIdx].targetRow && robotCol == inventory[selectedProductIdx].targetCol && !isDelivering) isWaitingAtPickup = true;
+                            robotRow = fullPath[pathIndex].first;
+                            robotCol = fullPath[pathIndex].second;
+                            if (pathIndex < (int)fullPath.size() - 1) {
+                                pathIndex++;
+                            }
+                            else if (selectedProductIdx != -1 && robotRow == inventory[selectedProductIdx].targetRow && robotCol == inventory[selectedProductIdx].targetCol && !isDelivering) {
+                                isWaitingAtPickup = true;
+                            }
                             else {
-                                systemState = 0; statusText = "MISSION COMPLETE";
-                                for (int i = 0; i < rows; i++) for (int j = 0; j < cols; j++) if (staticGrid[i][j] == 0) grid[i][j] = 0;
-                                selectedProductIdx = -1; fullPath.clear(); estimatedTime = 0.0f;
+                                systemState = 0; 
+                                statusText = "MISSION COMPLETE";
+                                for (int i = 0; i < rows; i++) {
+                                    for (int j = 0; j < cols; j++) {
+                                        if (staticGrid[i][j] == 0) {
+                                            grid[i][j] = 0;
+                                        }
+                                    }
+                                }
+                                selectedProductIdx = -1; 
+                                fullPath.clear(); 
+                                estimatedTime = 0.0f;
                             }
                             moveTimer = 0.0f;
                         }
@@ -333,10 +376,39 @@ int main() {
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
                 float px = offsetX + (j * cellSize), py = offsetY + (i * cellSize);
-                if (grid[i][j] == 1) DrawRectangleRec({ px, py, cellSize, cellSize }, COLOR_OBSTACLE);
+
+                if (grid[i][j] == 1) {
+                    DrawRectangleRec({ px, py, cellSize, cellSize }, COLOR_OBSTACLE);
+
+                    bool hasProduct = false;
+                    string currentIconName = "";
+
+                    for (const auto& p : inventory) {
+                        if (p.shelfRow == i && p.shelfCol == j) {
+                            hasProduct = true;
+                            currentIconName = p.name;
+                            break;
+                        }
+                    }
+
+                    if (hasProduct && productIcons.count(currentIconName)) {
+                        Texture2D tex = productIcons[currentIconName];
+                        Rectangle src = { 0, 0, (float)tex.width, (float)tex.height };
+
+                        float iconSize = cellSize * 0.8f;
+                        Rectangle dest = { px + (cellSize - iconSize) / 2.0f, py + (cellSize - iconSize) / 2.0f, iconSize, iconSize };
+
+                        DrawTexturePro(tex, src, dest, { 0, 0 }, 0.0f, WHITE);
+                    }
+                }
                 DrawRectangleLinesEx({ px, py, cellSize, cellSize }, 0.5f, COLOR_GRID_LINES);
-                if (selectedProductIdx != -1 && i == inventory[selectedProductIdx].targetRow && j == inventory[selectedProductIdx].targetCol) DrawRectangleRec({ px + 2, py + 2, cellSize - 4, cellSize - 4 }, Fade(GREEN, 0.4f));
-                if (i == deliveryRow && j == deliveryCol) DrawRectangleLinesEx({ px + 2, py + 2, cellSize - 4, cellSize - 4 }, 2.0f, RED);
+
+                if (selectedProductIdx != -1 && i == inventory[selectedProductIdx].targetRow && j == inventory[selectedProductIdx].targetCol) {
+                    DrawRectangleRec({ px + 2, py + 2, cellSize - 4, cellSize - 4 }, Fade(GREEN, 0.4f));
+                }
+                if (i == deliveryRow && j == deliveryCol) {
+                    DrawRectangleLinesEx({ px + 2, py + 2, cellSize - 4, cellSize - 4 }, 2.0f, RED);
+                }
             }
         }
         if (!fullPath.empty()) {
@@ -386,5 +458,11 @@ int main() {
         }
         EndDrawing();
     }
-    UnloadFont(fontTitle); CloseWindow(); return 0;
+    for (auto& pair : productIcons) {
+        UnloadTexture(pair.second);
+    }
+    productIcons.clear();
+    UnloadFont(fontTitle); 
+    CloseWindow();
+    return 0;
 }
